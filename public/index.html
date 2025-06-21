@@ -17,9 +17,10 @@
   </div>
 
   <div id="chat" style="display:none;">
-    <div id="chatbox"></div>
+    <div id="chatbox" contenteditable="false"></div>
     <div id="input">
       <input id="messageInput" type="text" placeholder="Type message..." />
+      <input type="file" id="imageInput" accept="image/*" />
       <button onclick="sendMessage()">Send</button>
     </div>
   </div>
@@ -28,6 +29,7 @@
     const socket = io();
     const chatbox = document.getElementById('chatbox');
     const input = document.getElementById('messageInput');
+    const imageInput = document.getElementById('imageInput');
 
     function joinRoom() {
       const username = document.getElementById("username").value.trim();
@@ -52,25 +54,14 @@
 
     socket.on("chat message", (msg) => {
       const div = document.createElement("div");
-      const timestamp = new Date().toLocaleTimeString();
-      div.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${msg}`;
+      div.textContent = msg;
       chatbox.insertBefore(div, chatbox.firstChild);
-      chatbox.scrollTop = chatbox.scrollHeight;
     });
 
-    socket.on("displayTyping", ({ user, isTyping }) => {
-      const existing = document.getElementById("typing-" + user);
-      if (isTyping) {
-        if (!existing) {
-          const div = document.createElement("div");
-          div.id = "typing-" + user;
-          div.className = "typing";
-          div.textContent = `💬 ${user} is typing...`;
-          chatbox.insertBefore(div, chatbox.firstChild);
-        }
-      } else {
-        if (existing) existing.remove();
-      }
+    socket.on("image", ({ username, imageData }) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<strong>${username}</strong>:<br><img src="${imageData}" style="max-width:300px; max-height:300px;" />`;
+      chatbox.insertBefore(div, chatbox.firstChild);
     });
 
     socket.on("errorMessage", (err) => {
@@ -120,23 +111,53 @@
       a.click();
     }
 
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') sendMessage();
+    // Handle image input
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files[0];
+      if (!file || file.size > 2 * 1024 * 1024) {
+        alert("Image too big or not selected. Max 2MB.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        socket.emit("image", reader.result);
+      };
+      reader.readAsDataURL(file);
     });
 
-    let typing = false;
-    let typingTimeout;
-
-    input.addEventListener("input", () => {
-      if (!typing) {
-        typing = true;
-        socket.emit("typing", true);
+    // Paste from clipboard
+    window.addEventListener("paste", (e) => {
+      const item = e.clipboardData.items[0];
+      if (item && item.type.indexOf("image") === 0) {
+        const file = item.getAsFile();
+        if (file.size > 2 * 1024 * 1024) return alert("Image too big (max 2MB)");
+        const reader = new FileReader();
+        reader.onload = () => {
+          socket.emit("image", reader.result);
+        };
+        reader.readAsDataURL(file);
       }
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        typing = false;
-        socket.emit("typing", false);
-      }, 1000);
+    });
+
+    // Drag and drop images
+    chatbox.addEventListener("dragover", (e) => e.preventDefault());
+    chatbox.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith("image/") && file.size < 2 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          socket.emit("image", reader.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert("Only images under 2MB allowed.");
+      }
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
     });
   </script>
 </body>

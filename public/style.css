@@ -40,15 +40,3 @@ button {
   padding: 30px;
   text-align: center;
 }
-
-.timestamp {
-  color: #888;
-  font-size: 0.8em;
-  margin-right: 5px;
-}
-
-.typing {
-  color: #aaa;
-  font-style: italic;
-  margin-bottom: 5px;
-}
