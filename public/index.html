@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Dark Chatroom</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div id="login">
+    <h2>Join Chatroom</h2>
+    <input type="text" id="username" placeholder="Username" /><br />
+    <input type="text" id="room" placeholder="Room name" /><br />
+    <input type="password" id="roomPassword" placeholder="Room password" /><br />
+    <button onclick="joinRoom()">Join</button>
+    <p id="error" style="color:red;"></p>
+  </div>
+
+  <div id="chat" style="display:none;">
+    <div id="chatbox"></div>
+    <div id="input">
+      <input id="messageInput" type="text" placeholder="Type message..." />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const chatbox = document.getElementById('chatbox');
+    const input = document.getElementById('messageInput');
+
+    function joinRoom() {
+      const username = document.getElementById("username").value.trim();
+      const room = document.getElementById("room").value.trim();
+      const password = document.getElementById("roomPassword").value;
+      if (!username || !room || !password) {
+        document.getElementById("error").textContent = "All fields required.";
+        return;
+      }
+      socket.emit("joinRoom", { username, room, password });
+    }
+
+    socket.on("chatHistory", (messages) => {
+      document.getElementById("login").style.display = "none";
+      document.getElementById("chat").style.display = "block";
+      messages.slice().reverse().forEach((msg) => {
+        const div = document.createElement("div");
+        div.textContent = msg;
+        chatbox.appendChild(div);
+      });
+    });
+
+    socket.on("chat message", (msg) => {
+      const div = document.createElement("div");
+      const timestamp = new Date().toLocaleTimeString();
+      div.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${msg}`;
+      chatbox.insertBefore(div, chatbox.firstChild);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    });
+
+    socket.on("displayTyping", ({ user, isTyping }) => {
+      const existing = document.getElementById("typing-" + user);
+      if (isTyping) {
+        if (!existing) {
+          const div = document.createElement("div");
+          div.id = "typing-" + user;
+          div.className = "typing";
+          div.textContent = `💬 ${user} is typing...`;
+          chatbox.insertBefore(div, chatbox.firstChild);
+        }
+      } else {
+        if (existing) existing.remove();
+      }
+    });
+
+    socket.on("errorMessage", (err) => {
+      document.getElementById("error").textContent = err;
+    });
+
+    socket.on("userList", (users) => {
+      const div = document.createElement("div");
+      div.textContent = "👥 Users: " + users.join(", ");
+      chatbox.insertBefore(div, chatbox.firstChild);
+    });
+
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (text === "/save") {
+        saveChatToFile();
+        input.value = '';
+        return;
+      }
+
+      if (text === "/clear") {
+        chatbox.innerHTML = "";
+        input.value = '';
+        return;
+      }
+
+      if (text === "/users") {
+        socket.emit("getUsers");
+        input.value = '';
+        return;
+      }
+
+      socket.emit("chat message", text);
+      input.value = '';
+    }
+
+    function saveChatToFile() {
+      let lines = [];
+      const chatMessages = chatbox.querySelectorAll('div');
+      chatMessages.forEach(div => lines.unshift(div.textContent));
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'chatlog.txt';
+      a.click();
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    let typing = false;
+    let typingTimeout;
+
+    input.addEventListener("input", () => {
+      if (!typing) {
+        typing = true;
+        socket.emit("typing", true);
+      }
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        typing = false;
+        socket.emit("typing", false);
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
