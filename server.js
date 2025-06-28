@@ -42,6 +42,13 @@ io.on("connection", (socket) => {
     rooms[room].messages.push(fullMessage);
     io.to(room).emit("chat message", fullMessage);
   });
+socket.on("clearChat", () => {
+  const room = socket.room;
+  if (room && rooms[room]) {
+    rooms[room].messages = []; // Clear server history
+    io.to(room).emit("clearChat"); // Tell all clients to clear
+  }
+});
 
 socket.on("getUsers", () => {
   const room = socket.room;
