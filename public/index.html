@@ -66,6 +66,10 @@
       chatbox.insertBefore(div, chatbox.firstChild);
     });
 
+    socket.on("clearChat", () => {
+      chatbox.innerHTML = "";
+    });
+
     function sendMessage() {
       const text = input.value.trim();
       if (!text) return;
@@ -80,8 +84,6 @@
         socket.emit("clearChat");
         input.value = '';
         return;
-   }
-
       }
 
       if (text === "/users") {
@@ -108,10 +110,6 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendMessage();
     });
-	socket.on("clearChat", () => {
-  chatbox.innerHTML = "";
-});
-
   </script>
 </body>
 </html>

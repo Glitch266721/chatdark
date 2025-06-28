@@ -29,7 +29,6 @@ io.on("connection", (socket) => {
     rooms[room].users.push(username);
 
     socket.emit("chatHistory", rooms[room].messages);
-
     io.to(room).emit("chat message", `🔐 ${username} joined the room.`);
   });
 
@@ -42,23 +41,21 @@ io.on("connection", (socket) => {
     rooms[room].messages.push(fullMessage);
     io.to(room).emit("chat message", fullMessage);
   });
-socket.on("clearChat", () => {
-  const room = socket.room;
-  if (room && rooms[room]) {
-    rooms[room].messages = []; // Clear server history
-    io.to(room).emit("clearChat"); // Tell all clients to clear
-  }
-});
 
-socket.on("getUsers", () => {
-  const room = socket.room;
-  if (room && rooms[room]) {
-    console.log(`Sending user list for room ${room}:`, rooms[room].users);
-    socket.emit("userList", rooms[room].users);
-  } else {
-    console.log("No room found or no users for getUsers request");
-  }
-});
+  socket.on("getUsers", () => {
+    const room = socket.room;
+    if (room && rooms[room]) {
+      socket.emit("userList", rooms[room].users);
+    }
+  });
+
+  socket.on("clearChat", () => {
+    const room = socket.room;
+    if (room && rooms[room]) {
+      rooms[room].messages = [];
+      io.to(room).emit("clearChat");
+    }
+  });
 
   socket.on("disconnect", () => {
     const room = socket.room;
